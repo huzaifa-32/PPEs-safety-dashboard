@@ -46,7 +46,7 @@ def load_model():
     if not os.path.exists("checkpoint_best_total.pth"):
         with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
             # ⚠️ APNA GOOGLE DRIVE KA DIRECT DOWNLOAD LINK YAHAN LAGAEIN
-            url = "APNA_DIRECT_DOWNLOAD_LINK_YAHAN_LAGAEIN"
+            url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal/view?usp=sharing"
             urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
             
     model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
