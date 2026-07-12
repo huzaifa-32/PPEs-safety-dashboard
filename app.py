@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import torch
 import smtplib
-import requests
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -36,13 +36,13 @@ st.sidebar.header("⚙️ Configuration")
 threshold = st.sidebar.slider("Confidence Threshold", min_value=0.10, max_value=1.00, value=0.45, step=0.05)
 receiver_email = st.sidebar.text_input("Receiver Email", value="huzaifar2005@gmail.com")
 
-# --- Smart Model Loading & Foolproof Downloader ---
+# --- Smart Model Loading & Clean Downloader ---
 @st.cache_resource
 def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
     file_path = "checkpoint_best_total.pth"
     
-    # 🔴 1. Puraani kharab file ko dafnana (Delete Corrupted HTML)
+    # 🔴 1. Purani Corrupted HTML File ko clean karna
     if os.path.exists(file_path):
         try:
             with open(file_path, 'rb') as f:
@@ -52,38 +52,22 @@ def load_model():
         except:
             pass
 
-    # 🔴 2. Direct Stream Downloader
+    # 🔴 2. Direct URL Downloader (No Google Drive Drama)
     if not os.path.exists(file_path):
-        with st.spinner("📥 Model weights download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
+        with st.spinner("📥 Model weights direct link se download ho rahe hain (124MB)..."):
             
-            # ⚠️ EDiT THiS: Apni Google Drive File ki ASLI ID yahan likhein (bina dots ke)
-            GOOGLE_DRIVE_FILE_ID = "1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal" 
-            
-            download_url = "https://docs.google.com/uc?export=download"
-            session = requests.Session()
+            # ⚠️ EDiT THiS: Hugging Face ya GitHub Release ka ASLi DiRECT LiNK yahan daalein
+            DIRECT_DOWNLOAD_URL = "https://huggingface.co/HuzaifaUrRehman/checkpoint_best_total/resolve/main/checkpoint_best_total.pth"
             
             try:
-                response = session.get(download_url, params={'id': GOOGLE_DRIVE_FILE_ID}, stream=True)
-                token = None
-                for key, value in response.cookies.items():
-                    if key.startswith('download_warning'):
-                        token = value
-                        break
-                
-                if token:
-                    response = session.get(download_url, params={'id': GOOGLE_DRIVE_FILE_ID, 'confirm': token}, stream=True)
-                    
-                with open(file_path, "wb") as f:
-                    for chunk in response.iter_content(32768):
-                        if chunk:
-                            f.write(chunk)
+                urllib.request.urlretrieve(DIRECT_DOWNLOAD_URL, file_path)
             except Exception as e:
-                st.error(f"❌ Connection Error: {e}")
+                st.error(f"❌ Download Link Error: {e}")
                 return None, CLASS_NAMES
 
-    # 🔴 3. Load Model Weights Safely
+    # 🔴 3. PyTorch Weights Verification & Loading
     if not os.path.exists(file_path):
-        st.error("❌ File download nahi ho saki. Please check your Google Drive File ID.")
+        st.error("❌ File download nahi ho saki. Link check karen.")
         return None, CLASS_NAMES
 
     try:
@@ -91,10 +75,10 @@ def load_model():
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
-        st.error(f"❌ PyTorch Load Error: {e}. File corrupt ho gayi thi, delete kar di hai. Page refresh karen.")
+        st.error(f"❌ PyTorch Load Error: {e}. File complete download nahi hui, page refresh karen.")
         return None, CLASS_NAMES
     
-    # Model Setup
+    # Model Wrap Architecture
     model = RFDETRSmall(num_classes=8)
     
     if isinstance(weights, dict) and 'model' in weights:
@@ -215,5 +199,3 @@ if uploaded_file and model_inference is not None:
                 st.success(f"🚀 Report successfully sent to {receiver_email}")
             except Exception as e:
                 st.error(f"❌ Connection Timeout/Error: {e}")
-elif uploaded_file and model_inference is None:
-    st.error("Model initialize nahi ho saka, isiliye prediction block ruk gaya hai. Pehle upar waala error hal karein.")
