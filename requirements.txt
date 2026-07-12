@@ -4,6 +4,6 @@ torchvision
 supervision
 rfdetr
 requests
-Pillow
 fpdf
+Pillow
 opencv-python-headless
