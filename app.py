@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import torch
 import smtplib
-import urllib.request
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -13,7 +13,7 @@ import supervision as sv
 from collections import Counter
 from rfdetr import RFDETRSmall
 
-# --- Page Configuration (Premium Theme) ---
+# --- Page Configuration ---
 st.set_page_config(
     page_title="AI Safety Inspector",
     page_icon="🔍",
@@ -36,30 +36,72 @@ st.sidebar.header("⚙️ Configuration")
 threshold = st.sidebar.slider("Confidence Threshold", min_value=0.10, max_value=1.00, value=0.25, step=0.05)
 receiver_email = st.sidebar.text_input("Receiver Email", value="huzaifar2005@gmail.com")
 
-# --- Smart Model Loading (Bulletproof Auto-Detect) ---
+# --- Smart Model Loading & Foolproof Downloader ---
 @st.cache_resource
 def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
+    file_path = "checkpoint_best_total.pth"
     
-    # 1. Check if weights exist, download if missing
-    if not os.path.exists("checkpoint_best_total.pth"):
+    # 🔴 STEP 1: Pehle se maujood kharab/corrupted HTML file ko delete karne ka tool
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(100)
+            if b'<' in header or b'html' in header.lower():
+                os.remove(file_path)
+        except:
+            pass
+
+    # 🔴 STEP 2: Large Google Drive File Bypasser Downloader
+    if not os.path.exists(file_path):
         with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
-            url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk..." # Aapka Google Drive Link
+            # ⚠️ APNA GOOGLE DRIVE LINK NICHE WALI LINE ME PASTE KAREIN
+            share_url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal/view?usp=sharing" 
+            
             try:
-                urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
+                # Extract File ID automatically
+                if "/d/" in share_url:
+                    file_id = share_url.split("/d/")[1].split("/")[0]
+                else:
+                    file_id = share_url
+                
+                download_url = "https://docs.google.com/uc?export=download"
+                session = requests.Session()
+                response = session.get(download_url, params={'id': file_id}, stream=True)
+                
+                # Check for Google Drive large file warning token
+                token = None
+                for key, value in response.cookies.items():
+                    if key.startswith('download_warning'):
+                        token = value
+                        break
+                
+                if token:
+                    response = session.get(download_url, params={'id': file_id, 'confirm': token}, stream=True)
+                    
+                with open(file_path, "wb") as f:
+                    for chunk in response.iter_content(32768):
+                        if chunk:
+                            f.write(chunk)
             except Exception as e:
                 st.error(f"❌ Download Link Error: {e}")
+                return None, CLASS_NAMES
                 
-    # 2. Safe Loading Wrapper
-    weights = torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu'), weights_only=False)
+    # 🔴 STEP 3: Safe Weights Loading
+    try:
+        weights = torch.load(file_path, map_location=torch.device('cpu'), weights_only=False)
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)  # Loading fail ho to file clear karo taake re-download ho sake
+        st.error(f"❌ Model load karne me masla aa raha hai: {e}. Please page refresh karen.")
+        return None, CLASS_NAMES
     
-    # Case A: Agar poora model object hi saved tha
+    # Inject weights into wrapper structure
     if isinstance(weights, RFDETRSmall):
         model = weights
         model.eval()
         return model, CLASS_NAMES
         
-    # Case B: Agar weights aik dictionary/state_dict hain
     model = RFDETRSmall(num_classes=8)
     
     if isinstance(weights, dict) and 'model' in weights:
@@ -69,21 +111,12 @@ def load_model():
     else:
         state_dict = getattr(weights, 'state_dict', lambda: weights)()
 
-    # Smart Injection: Khud dhoondo function kahan chhupa hai
     if hasattr(model, 'load_state_dict'):
         model.load_state_dict(state_dict)
     elif hasattr(model, 'model') and hasattr(model.model, 'load_state_dict'):
         model.model.load_state_dict(state_dict)
     elif hasattr(model, 'net') and hasattr(model.net, 'load_state_dict'):
         model.net.load_state_dict(state_dict)
-    elif hasattr(model, 'load'):
-        model.load("checkpoint_best_total.pth")
-    else:
-        # Ultimate Fallback
-        try:
-            model = RFDETRSmall(num_classes=8, weights="checkpoint_best_total.pth")
-        except:
-            pass
 
     model.eval()
     return model, CLASS_NAMES
