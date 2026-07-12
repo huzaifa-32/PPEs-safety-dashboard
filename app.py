@@ -42,7 +42,7 @@ def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
     file_path = "checkpoint_best_total.pth"
     
-    # 🔴 1. Purani Corrupted HTML File ko clean karna
+    # 1. Corrupted HTML File Check
     if os.path.exists(file_path):
         try:
             with open(file_path, 'rb') as f:
@@ -52,11 +52,10 @@ def load_model():
         except:
             pass
 
-    # 🔴 2. Direct URL Downloader (No Google Drive Drama)
+    # 2. Direct URL Downloader
     if not os.path.exists(file_path):
-        with st.spinner("📥 Model weights direct link se download ho rahe hain (124MB)..."):
-            
-            # ⚠️ EDiT THiS: Hugging Face ya GitHub Release ka ASLi DiRECT LiNK yahan daalein
+        with st.spinner("📥 Model weights download ho rahe hain (124MB)..."):
+            # ⚠️ EDiT THiS: Hugging Face ya GitHub Release ka direct download link yahan daalein
             DIRECT_DOWNLOAD_URL = "https://huggingface.co/HuzaifaUrRehman/checkpoint_best_total/resolve/main/checkpoint_best_total.pth"
             
             try:
@@ -65,20 +64,20 @@ def load_model():
                 st.error(f"❌ Download Link Error: {e}")
                 return None, CLASS_NAMES
 
-    # 🔴 3. PyTorch Weights Verification & Loading
     if not os.path.exists(file_path):
         st.error("❌ File download nahi ho saki. Link check karen.")
         return None, CLASS_NAMES
 
+    # 3. PyTorch Weights Loading
     try:
         weights = torch.load(file_path, map_location=torch.device('cpu'), weights_only=False)
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
-        st.error(f"❌ PyTorch Load Error: {e}. File complete download nahi hui, page refresh karen.")
+        st.error(f"❌ PyTorch Load Error: {e}. Page refresh karen.")
         return None, CLASS_NAMES
     
-    # Model Wrap Architecture
+    # Model Wrap Setup
     model = RFDETRSmall(num_classes=8)
     
     if isinstance(weights, dict) and 'model' in weights:
@@ -93,7 +92,12 @@ def load_model():
     elif hasattr(model, 'model') and hasattr(model.model, 'load_state_dict'):
         model.model.load_state_dict(state_dict)
 
-    model.eval()
+    # 🔴 FIXED: Safe Eval check taake AttributeError na aaye
+    if hasattr(model, 'eval'):
+        model.eval()
+    elif hasattr(model, 'model') and hasattr(model.model, 'eval'):
+        model.model.eval()
+
     return model, CLASS_NAMES
 
 model_inference, CLASS_NAMES = load_model()
