@@ -1,25 +1,8 @@
-import urllib.request
-
-@st.cache_resource
-def load_model():
-    CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
-    model = RFDETRSmall(num_classes=8)
-    
-    # Agar file maujood nahi hai to auto-download karein
-    if not os.path.exists("checkpoint_best_total.pth"):
-        with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
-            # Yahan apna Google Drive ka direct download link lagana hoga
-            # (Main aapko direct link banana sikha doonga)
-            url = "APNA_DIRECT_DOWNLOAD_LINK_YAHAN_LAGAEIN"
-            urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
-            
-    model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
-    model.eval()
-    return model, CLASS_NAMES
 import streamlit as st
 import os
 import torch
 import smtplib
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -58,13 +41,17 @@ receiver_email = st.sidebar.text_input("Receiver Email", value="huzaifar2005@gma
 def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
     model = RFDETRSmall(num_classes=8)
-    if os.path.exists("checkpoint_best_total.pth"):
-        model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
-        model.eval()
-        return model, CLASS_NAMES
-    else:
-        st.error("❌ 'checkpoint_best_total.pth' file directory me nahi mili!")
-        return None, CLASS_NAMES
+    
+    # Agar weights file folder me nahi milti to auto-download karein
+    if not os.path.exists("checkpoint_best_total.pth"):
+        with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
+            # ⚠️ APNA GOOGLE DRIVE KA DIRECT DOWNLOAD LINK YAHAN LAGAEIN
+            url = "APNA_DIRECT_DOWNLOAD_LINK_YAHAN_LAGAEIN"
+            urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
+            
+    model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
+    model.eval()
+    return model, CLASS_NAMES
 
 model_inference, CLASS_NAMES = load_model()
 
