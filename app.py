@@ -35,7 +35,7 @@ def load_model():
     if not os.path.exists(file_path):
         with st.spinner("📥 Model download ho raha hai... Please wait."):
             # ⚠️ Apna Hugging Face ya direct link yahan daalein!
-            DOWNLOAD_URL = "https://huggingface.co/HuzaifaUrRehman/checkpoint_best_total/resolve/main/checkpoint_best_total.pth"
+            DOWNLOAD_URL = "hf download hf://HuzaifaUrRehman/checkpoint_best_total/checkpoint_best_total.pth"
             
             try:
                 response = requests.get(DOWNLOAD_URL, stream=True)
