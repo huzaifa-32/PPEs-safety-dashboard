@@ -51,7 +51,7 @@ def load_model():
                 st.error(f"❌ Download Link Error: {e}")
                 
     # 2. Safe Loading Wrapper
-    weights = torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu'))
+    weights = torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu'), weights_only=False)
     
     # Case A: Agar poora model object hi saved tha
     if isinstance(weights, RFDETRSmall):
