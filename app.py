@@ -36,20 +36,55 @@ st.sidebar.header("⚙️ Configuration")
 threshold = st.sidebar.slider("Confidence Threshold", min_value=0.10, max_value=1.00, value=0.25, step=0.05)
 receiver_email = st.sidebar.text_input("Receiver Email", value="huzaifar2005@gmail.com")
 
-# --- Model Loading (Cached for performance) ---
+# --- Smart Model Loading (Bulletproof Auto-Detect) ---
 @st.cache_resource
 def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
-    model = RFDETRSmall(num_classes=8)
     
-    # Agar weights file folder me nahi milti to auto-download karein
+    # 1. Check if weights exist, download if missing
     if not os.path.exists("checkpoint_best_total.pth"):
         with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
-            # ⚠️ APNA GOOGLE DRIVE KA DIRECT DOWNLOAD LINK YAHAN LAGAEIN
-            url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal/view?usp=sharing"
-            urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
-            
-    model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
+            url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk..." # Aapka Google Drive Link
+            try:
+                urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
+            except Exception as e:
+                st.error(f"❌ Download Link Error: {e}")
+                
+    # 2. Safe Loading Wrapper
+    weights = torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu'))
+    
+    # Case A: Agar poora model object hi saved tha
+    if isinstance(weights, RFDETRSmall):
+        model = weights
+        model.eval()
+        return model, CLASS_NAMES
+        
+    # Case B: Agar weights aik dictionary/state_dict hain
+    model = RFDETRSmall(num_classes=8)
+    
+    if isinstance(weights, dict) and 'model' in weights:
+        state_dict = weights['model']
+    elif isinstance(weights, dict):
+        state_dict = weights
+    else:
+        state_dict = getattr(weights, 'state_dict', lambda: weights)()
+
+    # Smart Injection: Khud dhoondo function kahan chhupa hai
+    if hasattr(model, 'load_state_dict'):
+        model.load_state_dict(state_dict)
+    elif hasattr(model, 'model') and hasattr(model.model, 'load_state_dict'):
+        model.model.load_state_dict(state_dict)
+    elif hasattr(model, 'net') and hasattr(model.net, 'load_state_dict'):
+        model.net.load_state_dict(state_dict)
+    elif hasattr(model, 'load'):
+        model.load("checkpoint_best_total.pth")
+    else:
+        # Ultimate Fallback
+        try:
+            model = RFDETRSmall(num_classes=8, weights="checkpoint_best_total.pth")
+        except:
+            pass
+
     model.eval()
     return model, CLASS_NAMES
 
@@ -59,7 +94,6 @@ model_inference, CLASS_NAMES = load_model()
 uploaded_file = st.file_uploader("📸 Upload a site image or frame...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file and model_inference:
-    # Target columns layout
     col1, col2 = st.columns(2)
     
     image = Image.open(uploaded_file)
@@ -68,17 +102,14 @@ if uploaded_file and model_inference:
         st.image(image, use_container_width=True)
         
     with st.spinner("⏳ AI Agent analysis run kar raha hai..."):
-        # Model Prediction
         detections = model_inference.predict(image, threshold=threshold)
         
-        # Annotations
         box_annotator = sv.BoxAnnotator()
         label_annotator = sv.LabelAnnotator()
         annotated_image = image.copy()
         annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections)
         annotated_image = label_annotator.annotate(scene=annotated_image, detections=detections)
         
-        # Save compressed image for PDF
         output_image_path = "detected_result.jpg"
         if annotated_image.mode in ("RGBA", "P"):
             annotated_image = annotated_image.convert("RGB")
@@ -89,7 +120,6 @@ if uploaded_file and model_inference:
         st.subheader("AI Detection Result")
         st.image(annotated_image, use_container_width=True)
 
-    # --- Metrics & Analysis Breakdown ---
     st.write("---")
     st.subheader("📊 Safety Analytics Breakdown")
     
@@ -101,17 +131,14 @@ if uploaded_file and model_inference:
     if len(object_counts) == 0:
         st.warning("⚠️ No safety gear or violations detected at this threshold.")
     else:
-        # Show professional metric blocks
         metric_cols = st.columns(len(object_counts))
         for idx, (obj_name, count) in enumerate(object_counts.items()):
             with metric_cols[idx]:
                 st.metric(label=obj_name.upper(), value=count)
 
-    # --- PDF & Email Automation Button ---
     st.write("---")
     if st.button("📧 Generate Report & Send Email"):
         with st.spinner("📩 PDF report compile aur email routing ho rahi hai..."):
-            # PDF Creation
             pdf_path = "Inference_Detection_Report.pdf"
             pdf = FPDF()
             pdf.add_page()
@@ -136,7 +163,6 @@ if uploaded_file and model_inference:
             pdf.image(output_image_path, x=25, y=None, w=160)
             pdf.output(pdf_path)
             
-            # SMTP Email Setup (Fetching from secure secrets)
             try:
                 YOUR_GMAIL = st.secrets["YOUR_GMAIL"]
                 YOUR_APP_PASSWORD = st.secrets["YOUR_APP_PASSWORD"]
