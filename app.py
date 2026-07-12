@@ -33,7 +33,7 @@ st.markdown('<div class="sub-title">Real-time PPE Detection & Automated Reportin
 
 # --- Sidebar Configuration ---
 st.sidebar.header("⚙️ Configuration")
-threshold = st.sidebar.slider("Confidence Threshold", min_value=0.10, max_value=1.00, value=0.25, step=0.05)
+threshold = st.sidebar.slider("Confidence Threshold", min_value=0.10, max_value=1.00, value=0.45, step=0.05)
 receiver_email = st.sidebar.text_input("Receiver Email", value="huzaifar2005@gmail.com")
 
 # --- Smart Model Loading & Foolproof Downloader ---
@@ -42,34 +42,28 @@ def load_model():
     CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
     file_path = "checkpoint_best_total.pth"
     
-    # 🔴 STEP 1: Pehle se maujood kharab/corrupted HTML file ko delete karne ka tool
+    # 🔴 1. Puraani kharab file ko dafnana (Delete Corrupted HTML)
     if os.path.exists(file_path):
         try:
             with open(file_path, 'rb') as f:
                 header = f.read(100)
-            if b'<' in header or b'html' in header.lower():
+            if b'<' in header or b'html' in header.lower() or os.path.getsize(file_path) < 1000000:
                 os.remove(file_path)
         except:
             pass
 
-    # 🔴 STEP 2: Large Google Drive File Bypasser Downloader
+    # 🔴 2. Direct Stream Downloader
     if not os.path.exists(file_path):
-        with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
-            # ⚠️ APNA GOOGLE DRIVE LINK NICHE WALI LINE ME PASTE KAREIN
-            share_url = "https://drive.google.com/file/d/1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal/view?usp=sharing" 
+        with st.spinner("📥 Model weights download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
+            
+            # ⚠️ EDiT THiS: Apni Google Drive File ki ASLI ID yahan likhein (bina dots ke)
+            GOOGLE_DRIVE_FILE_ID = "1ok5t5Ad-RRgbFbNEKk5dwNQCqoa6DYal" 
+            
+            download_url = "https://docs.google.com/uc?export=download"
+            session = requests.Session()
             
             try:
-                # Extract File ID automatically
-                if "/d/" in share_url:
-                    file_id = share_url.split("/d/")[1].split("/")[0]
-                else:
-                    file_id = share_url
-                
-                download_url = "https://docs.google.com/uc?export=download"
-                session = requests.Session()
-                response = session.get(download_url, params={'id': file_id}, stream=True)
-                
-                # Check for Google Drive large file warning token
+                response = session.get(download_url, params={'id': GOOGLE_DRIVE_FILE_ID}, stream=True)
                 token = None
                 for key, value in response.cookies.items():
                     if key.startswith('download_warning'):
@@ -77,31 +71,30 @@ def load_model():
                         break
                 
                 if token:
-                    response = session.get(download_url, params={'id': file_id, 'confirm': token}, stream=True)
+                    response = session.get(download_url, params={'id': GOOGLE_DRIVE_FILE_ID, 'confirm': token}, stream=True)
                     
                 with open(file_path, "wb") as f:
                     for chunk in response.iter_content(32768):
                         if chunk:
                             f.write(chunk)
             except Exception as e:
-                st.error(f"❌ Download Link Error: {e}")
+                st.error(f"❌ Connection Error: {e}")
                 return None, CLASS_NAMES
-                
-    # 🔴 STEP 3: Safe Weights Loading
+
+    # 🔴 3. Load Model Weights Safely
+    if not os.path.exists(file_path):
+        st.error("❌ File download nahi ho saki. Please check your Google Drive File ID.")
+        return None, CLASS_NAMES
+
     try:
         weights = torch.load(file_path, map_location=torch.device('cpu'), weights_only=False)
     except Exception as e:
         if os.path.exists(file_path):
-            os.remove(file_path)  # Loading fail ho to file clear karo taake re-download ho sake
-        st.error(f"❌ Model load karne me masla aa raha hai: {e}. Please page refresh karen.")
+            os.remove(file_path)
+        st.error(f"❌ PyTorch Load Error: {e}. File corrupt ho gayi thi, delete kar di hai. Page refresh karen.")
         return None, CLASS_NAMES
     
-    # Inject weights into wrapper structure
-    if isinstance(weights, RFDETRSmall):
-        model = weights
-        model.eval()
-        return model, CLASS_NAMES
-        
+    # Model Setup
     model = RFDETRSmall(num_classes=8)
     
     if isinstance(weights, dict) and 'model' in weights:
@@ -115,8 +108,6 @@ def load_model():
         model.load_state_dict(state_dict)
     elif hasattr(model, 'model') and hasattr(model.model, 'load_state_dict'):
         model.model.load_state_dict(state_dict)
-    elif hasattr(model, 'net') and hasattr(model.net, 'load_state_dict'):
-        model.net.load_state_dict(state_dict)
 
     model.eval()
     return model, CLASS_NAMES
@@ -126,7 +117,7 @@ model_inference, CLASS_NAMES = load_model()
 # --- Main UI Layout ---
 uploaded_file = st.file_uploader("📸 Upload a site image or frame...", type=["jpg", "jpeg", "png"])
 
-if uploaded_file and model_inference:
+if uploaded_file and model_inference is not None:
     col1, col2 = st.columns(2)
     
     image = Image.open(uploaded_file)
@@ -221,6 +212,8 @@ if uploaded_file and model_inference:
                 server.sendmail(YOUR_GMAIL, receiver_email, msg.as_string())
                 server.quit()
                 
-                st.success(f"🚀 BOOM! Report successfully sent to {receiver_email}")
+                st.success(f"🚀 Report successfully sent to {receiver_email}")
             except Exception as e:
                 st.error(f"❌ Connection Timeout/Error: {e}")
+elif uploaded_file and model_inference is None:
+    st.error("Model initialize nahi ho saka, isiliye prediction block ruk gaya hai. Pehle upar waala error hal karein.")
