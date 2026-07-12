@@ -1,3 +1,21 @@
+import urllib.request
+
+@st.cache_resource
+def load_model():
+    CLASS_NAMES = ['goggles', 'helmet', 'no-goggles', 'no-helmet', 'no-vest', 'vest', 'class_6', 'class_7']
+    model = RFDETRSmall(num_classes=8)
+    
+    # Agar file maujood nahi hai to auto-download karein
+    if not os.path.exists("checkpoint_best_total.pth"):
+        with st.spinner("📥 Model weights cloud se download ho rahe hain (124MB)... Pehli baar me 1-2 minute lagenge."):
+            # Yahan apna Google Drive ka direct download link lagana hoga
+            # (Main aapko direct link banana sikha doonga)
+            url = "APNA_DIRECT_DOWNLOAD_LINK_YAHAN_LAGAEIN"
+            urllib.request.urlretrieve(url, "checkpoint_best_total.pth")
+            
+    model.load_state_dict(torch.load("checkpoint_best_total.pth", map_location=torch.device('cpu')))
+    model.eval()
+    return model, CLASS_NAMES
 import streamlit as st
 import os
 import torch
