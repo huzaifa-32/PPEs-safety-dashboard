@@ -1,8 +1,7 @@
-opencv-python-headless
 streamlit
 torch
-torchvision
-supervision
 fpdf
-pillow
+Pillow
+supervision
 rfdetr
+requests
