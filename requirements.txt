@@ -1,9 +1,9 @@
-opencv-python-headless
-streamlit==1.36.0
+streamlit
 torch
 torchvision
-fpdf
-Pillow
 supervision
 rfdetr
 requests
+Pillow
+fpdf
+opencv-python-headless
