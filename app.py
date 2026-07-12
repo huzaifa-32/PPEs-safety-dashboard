@@ -11,7 +11,7 @@ st.title("AI Visual Inspection Safety Dashboard")
 @st.cache_resource
 def get_model():
     # PATH where file SHOULD be
-    file_path = "chttps://huggingface.co/HuzaifaUrRehman/checkpoint_best_total/resolve/main/checkpoint_best_total.pth"
+    file_path = "https://huggingface.co/HuzaifaUrRehman/checkpoint_best_total/resolve/main/checkpoint_best_total.pth"
     
     # Check if file exists
     if not os.path.exists(file_path):
